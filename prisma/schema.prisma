@@ -1,0 +1,37 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model UserProfile {
+  id               Int       @id @default(autoincrement())
+  userId           Int       @unique
+  telegramId       Int?      @unique
+  username         String?   @unique 
+  email            String?   @unique
+  fullName         String?
+  bio              String?
+  avatarUrl        String?   
+  location         String?   
+  roles            String[]  @default(["EXECUTOR"])
+  stack            String[]  @default([])
+  specialization   String[]  @default([])
+  experienceLevel  String?   @default("JUNIOR")
+  status           String    @default("ACTIVE")
+  rating           Float?    @default(0.0) 
+  completedJobs    Int       @default(0)   
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  lastLoginAt      DateTime? 
+  
+  @@index([status])
+  @@index([roles])
+  @@index([stack])
+  @@index([specialization])
+  @@index([experienceLevel])
+  @@index([rating])
+}
