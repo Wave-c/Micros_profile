@@ -1,48 +1,147 @@
-import { Request, Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from "express";
+import type { RoleValue } from "./domain/role";
+import { ALL_ROLES, roleSetsEqual } from "./domain/role";
+import { isUuid } from "./uuid";
+import prisma from "./infrastructure/prisma";
 
 declare global {
   namespace Express {
     interface Request {
       user?: {
         userId: number;
+        userUuid: string | null;
+        roles: RoleValue[];
       };
     }
   }
 }
 
-export const authMiddleware = (
+function headerString(req: Request, name: string): string | undefined {
+  const v = req.headers[name.toLowerCase()];
+  if (Array.isArray(v)) return v[0];
+  return typeof v === "string" ? v : undefined;
+}
+
+function parseXUserId(
+  raw: string,
+): { kind: "uuid"; value: string } | { kind: "userId"; userId: number } | null {
+  const t = raw.trim();
+  if (isUuid(t)) return { kind: "uuid", value: t };
+  if (/^\d+$/.test(t)) {
+    const userId = parseInt(t, 10);
+    if (userId > 0) return { kind: "userId", userId };
+  }
+  return null;
+}
+
+function parseRoles(raw: string): RoleValue[] {
+  const tokens = raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  const allowed = new Set<string>(ALL_ROLES);
+  const out: RoleValue[] = [];
+  for (const t of tokens) {
+    const key = t.toUpperCase();
+    if (!allowed.has(key)) {
+      throw new Error(`Unknown role: ${t}`);
+    }
+    out.push(key as RoleValue);
+  }
+  return out;
+}
+
+export const authMiddleware = async (
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) => {
   try {
-    const headerUserId = req.headers['x-user-id'];
-    
+    const headerUserId = headerString(req, "x-user-id");
+    const headerRoles = headerString(req, "x-roles");
+
     if (!headerUserId) {
       return res.status(401).json({
-        error: 'Unauthorized',
-        message: 'Missing x-user-id header'
+        error: "Unauthorized",
+        message: "Missing X-User-Id header",
       });
     }
-    
-    const userId = parseInt(headerUserId as string);
-    
-    if (isNaN(userId)) {
+
+    if (!headerRoles) {
+      return res.status(401).json({
+        error: "Unauthorized",
+        message: "Missing X-Roles header",
+      });
+    }
+
+    const idParsed = parseXUserId(headerUserId);
+    if (!idParsed) {
       return res.status(400).json({
-        error: 'Bad Request',
-        message: 'x-user-id must be a number'
+        error: "Bad Request",
+        message: "X-User-Id must be a valid UUID or a positive integer userId",
       });
     }
-    
-    req.user = { userId };
-    
+
+    let roles: RoleValue[];
+    try {
+      roles = parseRoles(headerRoles);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Invalid roles";
+      return res.status(400).json({
+        error: "Bad Request",
+        message: msg,
+      });
+    }
+
+    const profile =
+      idParsed.kind === "uuid"
+        ? await prisma.userProfile.findUnique({
+            where: { userUuid: idParsed.value },
+            select: { userId: true, userUuid: true, roles: true },
+          })
+        : await prisma.userProfile.findUnique({
+            where: { userId: idParsed.userId },
+            select: { userId: true, userUuid: true, roles: true },
+          });
+
+    if (!profile) {
+      return res.status(401).json({
+        error: "Unauthorized",
+        message: "No profile for this X-User-Id",
+      });
+    }
+
+    const allowed = new Set<string>(ALL_ROLES);
+    const storedRoles: RoleValue[] = [];
+    for (const r of profile.roles) {
+      const key = String(r).toUpperCase();
+      if (!allowed.has(key)) {
+        return res.status(500).json({
+          error: "Internal Server Error",
+          message: `Profile has invalid role in database: ${r}`,
+        });
+      }
+      storedRoles.push(key as RoleValue);
+    }
+
+    if (!roleSetsEqual(storedRoles, roles)) {
+      return res.status(403).json({
+        error: "Forbidden",
+        message: "X-Roles does not match roles stored for this profile",
+      });
+    }
+
+    req.user = {
+      userId: profile.userId,
+      userUuid: profile.userUuid ?? null,
+      roles: storedRoles,
+    };
     next();
-    
   } catch (error) {
-    console.error('Auth middleware error:', error);
+    console.error("Auth middleware error:", error);
     res.status(500).json({
-      error: 'Internal Server Error',
-      message: 'Authentication failed'
+      error: "Internal Server Error",
+      message: "Authentication failed",
     });
   }
 };

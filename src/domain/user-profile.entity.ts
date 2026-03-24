@@ -1,10 +1,13 @@
-import { Role } from './role';
+import type { RoleValue } from "./role";
+
+export type UserProfileStatus = "ACTIVE" | "INACTIVE" | "BANNED" | "BUSY";
 
 export interface UserProfile {
   userId: number;
-  roles: Role[];
+  userUuid?: string | null;
+  roles: RoleValue[];
   stack: string[];
   specialization: string[];
-  telegramId?: number;
-  status: 'ACTIVE' | 'BLOCKED';
+  telegramId?: number | null;
+  status: UserProfileStatus;
 }
