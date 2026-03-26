@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import type { RoleValue } from "./domain/role";
-import { ALL_ROLES, roleSetsEqual } from "./domain/role";
+import { ALL_ROLES } from "./domain/role";
 import { isUuid } from "./uuid";
 import prisma from "./infrastructure/prisma";
 
@@ -21,23 +21,6 @@ function headerString(req: Request, name: string): string | undefined {
   return typeof v === "string" ? v : undefined;
 }
 
-function parseRoles(raw: string): RoleValue[] {
-  const tokens = raw
-    .split(",")
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const allowed = new Set<string>(ALL_ROLES);
-  const out: RoleValue[] = [];
-  for (const t of tokens) {
-    const key = t.toUpperCase();
-    if (!allowed.has(key)) {
-      throw new Error(`Unknown role: ${t}`);
-    }
-    out.push(key as RoleValue);
-  }
-  return out;
-}
-
 export const authMiddleware = async (
   req: Request,
   res: Response,
@@ -45,7 +28,6 @@ export const authMiddleware = async (
 ) => {
   try {
     const headerUserId = headerString(req, "x-user-id");
-    const headerRoles = headerString(req, "x-roles");
 
     if (!headerUserId) {
       return res.status(401).json({
@@ -54,29 +36,11 @@ export const authMiddleware = async (
       });
     }
 
-    if (!headerRoles) {
-      return res.status(401).json({
-        error: "Unauthorized",
-        message: "Missing X-Roles header",
-      });
-    }
-
     const userUuid = headerUserId.trim();
     if (!isUuid(userUuid)) {
       return res.status(400).json({
         error: "Bad Request",
         message: "X-User-Id must be a valid UUID",
-      });
-    }
-
-    let roles: RoleValue[];
-    try {
-      roles = parseRoles(headerRoles);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Invalid roles";
-      return res.status(400).json({
-        error: "Bad Request",
-        message: msg,
       });
     }
 
@@ -92,7 +56,6 @@ export const authMiddleware = async (
       });
     }
 
-    // Проверяем, что X-Roles совпадают с ролями из БД (порядок не важен)
     const allowed = new Set<string>(ALL_ROLES);
     const storedRoles: RoleValue[] = [];
     for (const r of profile.roles) {
@@ -104,13 +67,6 @@ export const authMiddleware = async (
         });
       }
       storedRoles.push(key as RoleValue);
-    }
-
-    if (!roleSetsEqual(storedRoles, roles)) {
-      return res.status(403).json({
-        error: "Forbidden",
-        message: "X-Roles does not match roles stored for this profile",
-      });
     }
 
     req.user = {
