@@ -128,31 +128,39 @@ export class ProfileController {
 
     /**
      * Создание профиля:
-     * POST /create_profile/:userUuid
-     * header: username
+     * POST /create_profile (и совместимо с /create_profile/:userUuid)
+     * header: x-user-id
+     * body: { "username": "..." }
      */
     async createProfileByUserUuid(req: Request, res: Response) {
         try {
-            const raw = req.params.userUuid;
-            const userUuid = Array.isArray(raw) ? raw[0] : raw;
+            const rawHeaderUserUuid = this.headerString(req, "x-user-id");
+            const rawParamUserUuid = req.params.userUuid;
+
+            const paramUserUuid = Array.isArray(rawParamUserUuid) ? rawParamUserUuid[0] : rawParamUserUuid;
+            const userUuid = rawHeaderUserUuid?.trim() ?? (paramUserUuid ? String(paramUserUuid).trim() : "");
+
             if (!userUuid || !isUuid(userUuid)) {
                 return res.status(400).json({
                     error: "Bad Request",
-                    message: "userUuid must be a valid UUID",
-                });
-            }
-
-            const rawUsername = this.headerString(req, "username");
-            const username =
-                rawUsername !== undefined ? rawUsername.trim() : "";
-            if (!username) {
-                return res.status(400).json({
-                    error: "Bad Request",
-                    message: "username header is required",
+                    message: "x-user-id must be a valid UUID",
                 });
             }
 
             const body = req.body as Record<string, unknown> | undefined;
+            const bodyUsername = body && typeof body.username === "string" ? body.username.trim() : "";
+
+            // Backward compatible: username can still come from the old header `username`.
+            const rawUsernameHeader = this.headerString(req, "username");
+            const username = bodyUsername || (rawUsernameHeader ? rawUsernameHeader.trim() : "");
+
+            if (!username) {
+                return res.status(400).json({
+                    error: "Bad Request",
+                    message: "username must be provided in body as { username }",
+                });
+            }
+
             const email =
                 body && typeof body.email === "string"
                     ? body.email

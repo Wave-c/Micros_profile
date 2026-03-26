@@ -9,6 +9,10 @@ router.post(
   "/create_profile/:userUuid",
   controller.createProfileByUserUuid.bind(controller),
 );
+router.post(
+  "/create_profile",
+  controller.createProfileByUserUuid.bind(controller),
+);
 router.get(
   "/username/:username/userUuid",
   controller.getUserUuidByUsername.bind(controller), //юзлес
