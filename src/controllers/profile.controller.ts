@@ -8,7 +8,6 @@ import {
   type RoleValue,
 } from "../domain/role";
 import { isUuid } from "../uuid";
-import { log } from "node:console";
 
 export class ProfileController {
   public service = new ProfileService();
@@ -17,6 +16,36 @@ export class ProfileController {
     const v = req.headers[name.toLowerCase()];
     if (Array.isArray(v)) return v[0];
     return typeof v === "string" ? v : undefined;
+  }
+
+  async getContact(req: Request, res: Response) {
+    try {
+      const userUuid = req.user?.userUuid;
+      if (!userUuid) {
+        return res.status(401).json({
+          error: "Unauthorized",
+          message: "User not authenticated",
+        });
+      }
+
+      const profile = await this.service.getProfileByUserUuid(userUuid);
+      if (!profile) {
+        return res.status(404).json({
+          error: "Not Found",
+          message: "Profile not found",
+        });
+      }
+
+      res.json({
+        uuid: profile.userUuid,
+        phone: profile.phone,
+        email: profile.email,
+        telegramUsername: profile.telegramUsername,
+      });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      res.status(500).json({ error: message });
+    }
   }
 
   async getMe(req: Request, res: Response) {

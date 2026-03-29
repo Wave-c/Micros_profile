@@ -22,6 +22,7 @@ router.use(authMiddleware);
 
 router.get("/user/:userUuid", controller.getProfileByUserUuid.bind(controller));
 router.get("/me", controller.getMe.bind(controller));
+router.get("/me/contact", controller.getContact.bind(controller));
 
 router.patch("/me", controller.update.bind(controller));
 router.post("/telegram", controller.connectTelegram.bind(controller));
