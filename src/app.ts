@@ -21,7 +21,7 @@ app.set("env", nodeEnv);
 
 app.use("/profiles", routes);
 
-const port = Number(process.env.PORT || 3001);
+const port = Number(process.env.PORT || 8077);
 
 app.listen(port, () => {
   console.log(`ProfileService started on ${port} (env: ${nodeEnv})`);

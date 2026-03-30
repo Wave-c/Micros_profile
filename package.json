@@ -3,15 +3,17 @@
   "main": "src/app.ts",
   "scripts": {
     "dev": "ts-node src/app.ts",
-    "dev:env": "set NODE_ENV=development&& ts-node src/app.ts",
+    "dev:env": "NODE_ENV=development ts-node src/app.ts",
     "build": "tsc",
     "start": "node dist/app.js",
-    "start:prod": "set NODE_ENV=production&& node dist/app.js"
+    "start:prod": "NODE_ENV=production node dist/app.js",
+    "db:migrate": "prisma migrate deploy",
+    "db:generate": "prisma generate"
   },
   "dependencies": {
     "@prisma/client": "^6.19.2",
     "@prisma/config": "^7.3.0",
-    "dotenv": "^17.2.3",
+    "dotenv": "^17.3.1",
     "express": "^5.2.1",
     "prisma": "^6.1.0"
   },
