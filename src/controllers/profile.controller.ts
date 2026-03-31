@@ -8,6 +8,7 @@ import {
   type RoleValue,
 } from "../domain/role";
 import { isUuid } from "../uuid";
+import { log } from "node:console";
 
 export class ProfileController {
   public service = new ProfileService();
